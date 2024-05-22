@@ -8,6 +8,7 @@
 #include <stdint.h>
 #include <thread>
 #include <vector>
+#include <random>
 
 template <typename Task = std::function<void()>>
     requires std::invocable<Task>
@@ -15,7 +16,9 @@ class thread_pool {
 public:
     thread_pool(const uint8_t num_threads = std::thread::hardware_concurrency())
         : num_threads(num_threads)
-        , queues(num_threads) {
+        , queues(num_threads)
+        , rng(std::random_device{}()) 
+        , dist(0, static_cast<size_t>(num_threads - 1)){
         semaphores.reserve(num_threads);
         for (size_t i = 0; i < num_threads; i++) {
             semaphores.emplace_back(std::make_unique<std::binary_semaphore>(0));
@@ -34,7 +37,7 @@ public:
         }
     }
     inline void enqueue_task(Task t) {
-        size_t idx = std::rand() % num_threads;
+        size_t idx = dist(rng) % num_threads;
         queues[idx].push_back(std::move(t));
         semaphores[idx]->release();
     }
@@ -45,6 +48,8 @@ private:
     std::vector<thread_safe_queue<Task>> queues;
     std::vector<std::thread> threads;
     std::vector<std::unique_ptr<std::binary_semaphore>> semaphores;
+    std::mt19937 rng;
+    std::uniform_int_distribution<size_t> dist;
     void worker_thread(const size_t thread_id) {
         while (true) {
             Task curr_task;
