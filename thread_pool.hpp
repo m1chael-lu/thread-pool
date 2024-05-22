@@ -9,6 +9,8 @@
 #include <thread>
 #include <vector>
 #include <random>
+#include <array>
+#include <optional>
 
 template <typename Task = std::function<void()>>
     requires std::invocable<Task>
@@ -19,9 +21,8 @@ public:
         , queues(num_threads)
         , rng(std::random_device{}()) 
         , dist(0, static_cast<size_t>(num_threads - 1)){
-        semaphores.reserve(num_threads);
         for (size_t i = 0; i < num_threads; i++) {
-            semaphores.emplace_back(std::make_unique<std::binary_semaphore>(0));
+            semaphores[i].emplace(0);
         }
         threads.reserve(num_threads);
         for (size_t i = 0; i < num_threads; i++) {
@@ -47,7 +48,7 @@ private:
     std::atomic<bool> stopping{false};
     std::vector<thread_safe_queue<Task>> queues;
     std::vector<std::thread> threads;
-    std::vector<std::unique_ptr<std::binary_semaphore>> semaphores;
+    std::array<std::optional<std::binary_semaphore>, 64> semaphores;
     std::mt19937 rng;
     std::uniform_int_distribution<size_t> dist;
     void worker_thread(const size_t thread_id) {
